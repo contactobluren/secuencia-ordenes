@@ -1,0 +1,23 @@
+﻿# Variables de entorno y claves secretas
+.env
+.env.*
+!.env.example
+
+# Dependencias y archivos generados por Next.js
+node_modules/
+.next/
+out/
+
+# Bases de datos locales y copias de seguridad
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Archivos de compilación de TypeScript
+*.tsbuildinfo
+
+# Accesos directos y copias de seguridad
+*.lnk
+*.bak
+*.backup.ts
