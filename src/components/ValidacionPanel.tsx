@@ -228,7 +228,7 @@ export default function ValidacionPanel({ proyectoId }: Props) {
     if (!pasoAValidar) return;
     if (esPasoCobro(pasoAValidar.nombre_hito)) {
       const conc = conceptoDesdeHito(pasoAValidar.nombre_hito);
-      if (conc && !cobroCompleto(proyecto, conc)) {
+      if (conc && montoObjetivo(proyecto, conc) > 0 && !cobroCompleto(proyecto, conc)) {
         alert("Todavía hay saldo pendiente. Registrá los pagos hasta completar el monto.");
         return;
       }
@@ -488,7 +488,7 @@ export default function ValidacionPanel({ proyectoId }: Props) {
                             e.stopPropagation();
                             if (esPasoCobro(paso.nombre_hito)) {
                               const conc = conceptoDesdeHito(paso.nombre_hito);
-                              if (conc && !cobroCompleto(proyecto, conc)) {
+                              if (conc && montoObjetivo(proyecto, conc) > 0 && !cobroCompleto(proyecto, conc)) {
                                 setPasoPago(paso);
                                 return;
                               }
@@ -498,7 +498,8 @@ export default function ValidacionPanel({ proyectoId }: Props) {
                           className="px-2.5 py-1 bg-blue-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-blue-500"
                         >
                           {esPasoCobro(paso.nombre_hito) &&
-                          !cobroCompleto(proyecto, conceptoDesdeHito(paso.nombre_hito) || "")
+                          montoObjetivo(proyecto, conceptoDesdeHito(paso.nombre_hito) || "") > 0 &&
+                           !cobroCompleto(proyecto, conceptoDesdeHito(paso.nombre_hito) || "")
                             ? "Registrar pago"
                             : "Validar"}
                         </span>
