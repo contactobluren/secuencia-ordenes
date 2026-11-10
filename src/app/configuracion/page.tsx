@@ -152,7 +152,7 @@ const guardarUser = async () => {
         ...editUser,
         nombre: userForm.nombre.trim(),
         email: userForm.email.trim().toLowerCase(),
-        password: "",
+       password: userForm.password,
         areaId: area.id,
         areaNombre: area.nombre,
         activo: userForm.activo,
