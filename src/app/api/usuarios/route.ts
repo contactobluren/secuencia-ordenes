@@ -1,9 +1,18 @@
-
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthenticatedUsuario } from "@/lib/auth-server";
 
 export const runtime = "nodejs";
+
+function esUUID(valor: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    valor
+  );
+}
+
+function estaActivo(valor: unknown) {
+  return valor === true || valor === 1 || valor === "1";
+}
 
 async function checkAuth() {
   const auth = await getAuthenticatedUsuario();
@@ -51,18 +60,19 @@ export async function GET() {
 
     if (error) throw error;
 
-    const users = (data ?? []).map((u) => ({
-      id: u.id,
-      nombre: u.nombre,
-      email: u.email,
-      areaId: u.area_id,
-      areaNombre: u.area_nombre,
-      activo: u.activo === true || u.activo === 1 || u.activo === "1",
-    }));
+    return NextResponse.json(
+      (data ?? []).map((u) => ({
+        id: u.id,
+        nombre: u.nombre,
+        email: u.email,
+        areaId: u.area_id,
+        areaNombre: u.area_nombre,
+        activo: estaActivo(u.activo),
+      }))
+    );
+  } catch (error) {
+    console.error("Error al listar usuarios:", error);
 
-    return NextResponse.json(users);
-  } catch (e) {
-    console.error("Error al listar usuarios:", e);
     return NextResponse.json(
       { error: "Error al listar usuarios" },
       { status: 500 }
@@ -77,15 +87,31 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    if (
-      !body.id ||
-      !body.email ||
-      !body.nombre ||
-      !body.areaId ||
-      !body.areaNombre
-    ) {
+    const id = String(body.id || "").trim();
+    const nombre = String(body.nombre || "").trim();
+    const email = String(body.email || "").trim().toLowerCase();
+    const password = String(body.password || "");
+    const areaId = String(body.areaId || "").trim();
+    const areaNombre = String(body.areaNombre || "").trim();
+    const activo = body.activo ? 1 : 0;
+
+    if (!id || !nombre || !email || !areaId || !areaNombre) {
       return NextResponse.json(
         { error: "Faltan datos obligatorios" },
+        { status: 400 }
+      );
+    }
+
+if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
+  return NextResponse.json(
+    { error: "El email ingresado no es válido" },
+    { status: 400 }
+  );
+}
+
+    if (password && password.length < 8) {
+      return NextResponse.json(
+        { error: "La contraseña debe tener al menos 8 caracteres" },
         { status: 400 }
       );
     }
@@ -93,16 +119,12 @@ export async function POST(req: Request) {
     const { data: area, error: areaError } = await supabaseAdmin
       .from("areas")
       .select("id, nombre, activo")
-      .eq("id", body.areaId)
+      .eq("id", areaId)
       .maybeSingle();
 
     if (areaError) throw areaError;
 
-    if (
-      !area ||
-      !(area.activo === true || area.activo === 1 || area.activo === "1") ||
-      area.nombre !== body.areaNombre
-    ) {
+    if (!area || !estaActivo(area.activo) || area.nombre !== areaNombre) {
       return NextResponse.json(
         { error: "El área seleccionada no existe o está inactiva" },
         { status: 400 }
@@ -111,46 +133,258 @@ export async function POST(req: Request) {
 
     const { data: existing, error: findError } = await supabaseAdmin
       .from("usuarios")
-      .select("id")
-      .eq("id", body.id)
+      .select(
+        "id, nombre, email, area_id, area_nombre, activo, auth_user_id"
+      )
+      .eq("id", id)
       .maybeSingle();
 
     if (findError) throw findError;
 
     if (!existing) {
       return NextResponse.json(
-        { error: "El usuario no existe. Para crear cuentas, usá el proceso de creación." },
+        { error: "El usuario no existe. Actualizá la lista e intentá nuevamente." },
         { status: 404 }
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    // Evitar que dos perfiles tengan el mismo email.
+    const { data: duplicate, error: duplicateError } = await supabaseAdmin
       .from("usuarios")
-      .update({
-        nombre: String(body.nombre).trim(),
-        email: String(body.email).trim().toLowerCase(),
-        area_id: area.id,
-        area_nombre: area.nombre,
-        activo: body.activo ? 1 : 0,
-      })
-      .eq("id", body.id)
-      .select("id, nombre, email, area_id, area_nombre, activo")
-      .single();
+      .select("id")
+      .eq("email", email)
+      .neq("id", id)
+      .maybeSingle();
 
-    if (error) throw error;
+    if (duplicateError) throw duplicateError;
+
+    if (duplicate) {
+      return NextResponse.json(
+        { error: "Ese email ya está asignado a otro usuario de la aplicación." },
+        { status: 409 }
+      );
+    }
+
+    const authUserId = String(existing.auth_user_id || "").trim();
+
+    /*
+     * CASO 1:
+     * El perfil tiene un hash antiguo en auth_user_id.
+     * Se crea una cuenta nueva de Supabase Auth y se vincula
+     * al perfil existente. Para esto es obligatorio ingresar
+     * una contraseña nueva en el formulario.
+     */
+    if (!esUUID(authUserId)) {
+      if (!password) {
+        return NextResponse.json(
+          {
+            error:
+              "Este usuario todavía no tiene una cuenta de acceso vinculada. Ingresá una contraseña nueva de al menos 8 caracteres para repararlo.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const { data: created, error: createError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+
+      if (createError || !created.user) {
+        console.error("Error al crear cuenta Auth:", createError);
+
+        return NextResponse.json(
+          {
+            error:
+              createError?.message ||
+              "No se pudo crear la cuenta de acceso en Supabase.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const newAuthUserId = created.user.id;
+
+      const { data: updatedProfile, error: profileError } =
+        await supabaseAdmin
+          .from("usuarios")
+          .update({
+            nombre,
+            email,
+            area_id: area.id,
+            area_nombre: area.nombre,
+            activo,
+            auth_user_id: newAuthUserId,
+          })
+          .eq("id", id)
+          .select("id, nombre, email, area_id, area_nombre, activo")
+          .single();
+
+      if (profileError || !updatedProfile) {
+        console.error("Error al vincular perfil:", profileError);
+
+        const { error: deleteAuthError } =
+          await supabaseAdmin.auth.admin.deleteUser(newAuthUserId);
+
+        if (deleteAuthError) {
+          console.error(
+            "No se pudo eliminar la cuenta Auth creada:",
+            deleteAuthError
+          );
+        }
+
+        return NextResponse.json(
+          {
+            error:
+              "Se creó la cuenta de acceso, pero no se pudo vincular al perfil. Se intentó revertir la creación. Contactá al administrador antes de volver a intentarlo.",
+          },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        id: updatedProfile.id,
+        nombre: updatedProfile.nombre,
+        email: updatedProfile.email,
+        areaId: updatedProfile.area_id,
+        areaNombre: updatedProfile.area_nombre,
+        activo: estaActivo(updatedProfile.activo),
+      });
+    }
+
+    /*
+     * CASO 2:
+     * El perfil ya tiene un identificador UUID.
+     * Verificamos que la cuenta de Supabase Auth exista.
+     */
+    const { data: authAccount, error: getAuthError } =
+      await supabaseAdmin.auth.admin.getUserById(authUserId);
+
+    if (getAuthError || !authAccount.user) {
+      console.error("No se encontró la cuenta Auth vinculada:", getAuthError);
+
+      return NextResponse.json(
+        {
+          error:
+            "El perfil tiene un identificador de autenticación, pero la cuenta vinculada no existe en Supabase Auth. No se modificó el usuario.",
+        },
+        { status: 409 }
+      );
+    }
+
+    // Comparamos contra el email REAL de Supabase Auth,
+    // no solamente contra el email guardado en el perfil.
+    const authEmailAnterior = String(
+      authAccount.user.email || ""
+    ).trim().toLowerCase();
+
+    const emailCambio = email !== authEmailAnterior;
+    const passwordCambio = password.length > 0;
+
+    // Guardamos primero los datos anteriores para poder restaurarlos.
+    const { data: updatedProfile, error: updateError } =
+      await supabaseAdmin
+        .from("usuarios")
+        .update({
+          nombre,
+          email,
+          area_id: area.id,
+          area_nombre: area.nombre,
+          activo,
+        })
+        .eq("id", id)
+        .select("id, nombre, email, area_id, area_nombre, activo")
+        .single();
+
+    if (updateError || !updatedProfile) {
+      throw updateError || new Error("No se pudo actualizar el perfil");
+    }
+
+    // Sincronizar email y/o contraseña en Supabase Auth.
+    if (emailCambio || passwordCambio) {
+      const authChanges: {
+        email?: string;
+        password?: string;
+        email_confirm?: boolean;
+      } = {};
+
+      if (emailCambio) {
+        authChanges.email = email;
+        authChanges.email_confirm = true;
+      }
+
+      if (passwordCambio) {
+        authChanges.password = password;
+      }
+
+      try {
+        const { error: authUpdateError } =
+          await supabaseAdmin.auth.admin.updateUserById(
+            authUserId,
+            authChanges
+          );
+
+        if (authUpdateError) {
+          throw authUpdateError;
+        }
+      } catch (authError) {
+        console.error("Error al actualizar Supabase Auth:", authError);
+
+        // Restaurar los datos anteriores del perfil.
+        const { error: rollbackError } = await supabaseAdmin
+          .from("usuarios")
+          .update({
+            nombre: existing.nombre,
+            email: existing.email,
+            area_id: existing.area_id,
+            area_nombre: existing.area_nombre,
+            activo: existing.activo,
+          })
+          .eq("id", id);
+
+        if (rollbackError) {
+          console.error("Error al restaurar el perfil:", rollbackError);
+
+          return NextResponse.json(
+            {
+              error:
+                "Falló la actualización de acceso y también la restauración del perfil. Se requiere revisión del administrador.",
+            },
+            { status: 500 }
+          );
+        }
+
+        const detail =
+          authError instanceof Error
+            ? authError.message
+            : "Error desconocido de autenticación";
+
+        return NextResponse.json(
+          {
+            error:
+              "Supabase no permitió actualizar el email o la contraseña. El perfil fue restaurado. Detalle: " +
+              detail,
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     return NextResponse.json({
-      id: data.id,
-      nombre: data.nombre,
-      email: data.email,
-      areaId: data.area_id,
-      areaNombre: data.area_nombre,
-      activo: data.activo === true || data.activo === 1 || data.activo === "1",
+      id: updatedProfile.id,
+      nombre: updatedProfile.nombre,
+      email: updatedProfile.email,
+      areaId: updatedProfile.area_id,
+      areaNombre: updatedProfile.area_nombre,
+      activo: estaActivo(updatedProfile.activo),
     });
-  } catch (e) {
-    console.error("Error al guardar usuario:", e);
+  } catch (error) {
+    console.error("Error al guardar usuario:", error);
+
     return NextResponse.json(
-      { error: "Error al guardar usuario" },
+      { error: "Error al guardar usuario. Revisá los datos e intentá nuevamente." },
       { status: 500 }
     );
   }
@@ -178,8 +412,6 @@ export async function DELETE(req: Request) {
       );
     }
 
-    // Por seguridad, no borramos el perfil todavía:
-    // también hay que eliminar la cuenta vinculada de Supabase Auth.
     return NextResponse.json(
       {
         error:
@@ -187,8 +419,9 @@ export async function DELETE(req: Request) {
       },
       { status: 501 }
     );
-  } catch (e) {
-    console.error("Error al eliminar usuario:", e);
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error);
+
     return NextResponse.json(
       { error: "Error al eliminar usuario" },
       { status: 500 }
