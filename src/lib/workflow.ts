@@ -1,5 +1,5 @@
 import { Plantilla, Proyecto, ProyectoPaso, UsuarioSesion } from "./types";
-import { conceptoDesdeHito, cobroCompleto, esPasoCobro } from "./money";
+import { conceptoDesdeHito, cobroCompleto, esPasoCobro, montoObjetivo } from "./money";
 
 export function crearPasosDesdePlantilla(plantilla: Plantilla): ProyectoPaso[] {
   return plantilla.pasos.map((p, idx) => ({
@@ -62,7 +62,7 @@ export function validarPaso(
   const paso = pasos[idx];
   if (esPasoCobro(paso.nombre_hito)) {
     const concepto = conceptoDesdeHito(paso.nombre_hito);
-    if (concepto && !cobroCompleto(proyecto, concepto)) {
+    if (concepto && montoObjetivo(proyecto, concepto) > 0 && !cobroCompleto(proyecto, concepto)) {
       // No avanzar si el cobro no está completo
       return proyecto;
     }
