@@ -226,6 +226,7 @@ export default function ValidacionPanel({ proyectoId }: Props) {
 
   const handleConfirmarValidacion = async () => {
     if (!pasoAValidar) return;
+
     if (esPasoCobro(pasoAValidar.nombre_hito)) {
       const conc = conceptoDesdeHito(pasoAValidar.nombre_hito);
       if (conc && montoObjetivo(proyecto, conc) > 0 && !cobroCompleto(proyecto, conc)) {
@@ -233,24 +234,33 @@ export default function ValidacionPanel({ proyectoId }: Props) {
         return;
       }
     }
+
     setConfirmando(true);
-    const actualizado = validarPaso(
-      proyecto,
-      pasoAValidar.id,
-      actor,
-      observaciones || undefined
-    );
     try {
-      await apiUpsertProyecto(actualizado);
-      setProyecto(actualizado);
+      const actualizado = validarPaso(
+        proyecto,
+        pasoAValidar.id,
+        actor,
+        observaciones || undefined
+      );
+
+      if (actualizado === proyecto) {
+        alert("No se pudo validar el paso. Verificá que siga pendiente y que te corresponda validarlo.");
+        return;
+      }
+
+      const guardado = await apiUpsertProyecto(actualizado);
+      setProyecto(guardado);
+      setPasoAValidar(null);
+      setObservaciones("");
+      setPasoDetalle(null);
     } catch (e) {
-      console.error(e);
-      alert("No se pudo guardar la validación");
+      console.error("Error al guardar la validación:", e);
+      const mensaje = e instanceof Error ? e.message : "Error desconocido";
+      alert(`No se pudo guardar la validación: ${mensaje}`);
+    } finally {
+      setConfirmando(false);
     }
-    setPasoAValidar(null);
-    setObservaciones("");
-    setPasoDetalle(null);
-    setConfirmando(false);
   };
 
   const handleConfirmarReverso = async () => {
