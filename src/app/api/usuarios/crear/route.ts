@@ -97,6 +97,10 @@ export async function POST(req: Request) {
         area_id: area.id,
         area_nombre: area.nombre,
         activo: activo ? 1 : 0,
+        // La columna "password" es obligatoria en la tabla (herencia de
+        // SQLite), pero la clave real vive solo en Supabase Auth.
+        // Guardamos un marcador, nunca la contraseña.
+        password: "supabase-auth",
         auth_user_id: authUserId,
       })
       .select("id, nombre, email, area_id, area_nombre, activo")
@@ -115,7 +119,23 @@ export async function POST(req: Request) {
       }
 
       authUserId = null;
-      throw profileError || new Error("No se pudo crear el perfil");
+      console.error("Error al crear perfil:", profileError);
+
+      if (profileError?.code === "23505") {
+        return NextResponse.json(
+          { error: "Ya existe un usuario con ese email." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error:
+            "No se pudo crear el perfil del usuario. Detalle: " +
+            (profileError?.message || "desconocido"),
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(
