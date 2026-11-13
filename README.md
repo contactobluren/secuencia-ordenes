@@ -1,70 +1,61 @@
-# BPM Bluren — Hojas de Secuencia (Intranet & PWA)
+# BPM Bluren — Hojas de Secuencia
 
-Aplicación web y PWA para digitalizar y controlar el seguimiento, validación y pagos de órdenes de trabajo y proyectos mediante Hojas de Secuencia dinámicas por áreas de trabajo.
+Aplicación web (y PWA instalable) para seguir, validar y cobrar las órdenes de trabajo y proyectos de Bluren mediante Hojas de Secuencia por área.
 
----
-
-## Stack Tecnológico
-
-- **Frontend / Fullstack**: Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS.
-- **Componentes e Iconos**: Lucide React, Tailwind Merge, Clsx.
-- **Persistencia de Datos**: **SQLite (`data/bpm.db`)** con `better-sqlite3` en modo **WAL (Write-Ahead Logging)**, optimizado para concurrencia multi-usuario sin colisiones en red local.
-- **Distribución**: Web en Intranet (red de oficina) y PWA instalable en Windows (Edge / Chrome).
+- **Producción:** https://secuencia-ordenes.vercel.app/
+- **Repositorio:** `contactobluren/secuencia-ordenes` (rama `main`)
 
 ---
 
-## Funcionalidades Principales
+## Stack
 
-1. **Alta de Proyectos**: Registro de código de proyecto, cliente, dirección de obra, presupuesto total, anticipo, saldo y notas.
-2. **Motor de Secuencia Dinámica**: Genera los hitos ordenados automáticamente según la plantilla de trabajo elegida.
-3. **Validación y Aprobación por Área**:
-   - Cada usuario solo puede aprobar los hitos asignados a su área de trabajo (el rol *Admin* puede aprobar cualquiera).
-   - Registro automático de usuario validador, fecha, hora y observaciones.
-4. **Módulo de Pagos**: Control y registro de cobros parciales de anticipos y saldos por medio de pago (Transferencia, Efectivo, etc.).
-5. **Dashboard e Indicadores**: Filtros de estado, cálculo automático de % de avance y seguimiento visual de hitos pendientes, aprobados o bloqueados.
-6. **Configuración de Usuarios y Áreas**: Gestión de cuentas, contraseñas, áreas y activación/desactivación de accesos.
+- **Next.js 15** (App Router) + React 19 + TypeScript + Tailwind CSS.
+- **Supabase**: base de datos (tablas `usuarios`, `areas`, `plantillas`, `proyectos`) y autenticación (Supabase Auth).
+- **Vercel**: hosting. Cada `git push` a `main` se publica automáticamente.
 
 ---
 
-## Puesta en Marcha en la Oficina
+## Funcionalidades
 
-### En la PC Servidora:
-Hacé doble clic en el archivo:
+1. **Alta de proyectos**: código, cliente, vendedor (usuario del área Comercial), canal de venta, moneda, presupuesto, anticipo, contacto y dirección de obra.
+2. **Secuencia dinámica**: los pasos se generan según la plantilla (tipo de entrada) elegida.
+3. **Validación por área**: cada usuario aprueba los pasos de su área; *Admin* puede aprobar cualquiera. Se registra quién, cuándo y observaciones.
+4. **Pagos**: cobros parciales de anticipo y saldo por medio de pago.
+5. **Resumen y métricas**: proyectos por sector, filtros (tipo, estado, canal, vendedor) y % de avance.
+6. **Configuración** (solo Admin): usuarios, áreas y secuencias.
+
+---
+
+## Cómo se publica un cambio
+
+1. Modificar el código en esta carpeta.
+2. Subirlo a GitHub (`git push origin main`).
+3. Vercel lo despliega solo en 1–2 minutos. Verificar en https://secuencia-ordenes.vercel.app/
+
+Si un cambio necesita columnas nuevas en Supabase, **primero** se crean en Supabase (SQL Editor) y **después** se publica el código.
+
+---
+
+## Desarrollo local (opcional)
+
+Requiere el archivo `.env.local` (no se sube a GitHub) con:
+
 ```text
-iniciar-BPM-Bluren.bat
+SUPABASE_URL=...
+SUPABASE_KEY=...
+SUPABASE_SECRET_KEY=...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 ```
-* Compila la aplicación automáticamente si es la primera vez.
-* Abre el navegador en `http://localhost:3000`.
-* Inicia el servidor escuchando para toda la red de la oficina en el puerto `3000`.
-* **Mantené la ventana de la consola abierta** mientras el sistema esté en uso.
 
-### En las demás computadoras de la red:
-1. Abrí Chrome o Edge e ingresá la IP de la PC servidora:
-   ```text
-   http://IP-DEL-SERVIDOR:3000
-   ```
-2. *(Opcional - Modo PWA)*: Hacé clic en el ícono de instalar en la barra de direcciones (o menú `⋮` ➔ *Instalar aplicación*). Quedará un ícono en el Escritorio que se abre en una ventana independiente como programa nativo.
+```bash
+npm install
+npm run dev
+```
 
-Para más detalles de configuración de red y firewall, consultá [SETUP-OFICINA.md](./SETUP-OFICINA.md).
+Ojo: en local la app usa la **misma base de Supabase que producción**.
 
 ---
 
-## Usuarios Iniciales
+## Versión anterior (SQLite)
 
-| Email | Contraseña | Área / Rol |
-|---|---|---|
-| `admin@empresa.com` | `admin` | Admin (Aprobación total) |
-| `maria@empresa.com` | `1234` | Comercial |
-| `carlos@empresa.com` | `1234` | Administración |
-| `ana@empresa.com` | `1234` | Producción |
-| `kari@empresa.com` | `1234` | Contabilidad |
-
----
-
-## Respaldo de Datos (Backups)
-
-Toda la información del sistema se encuentra en un único archivo:
-```text
-data/bpm.db
-```
-Para hacer una copia de seguridad diaria o semanal, simplemente copiá ese archivo a un pendrive o carpeta compartida externa.
+La versión original funcionaba en una PC de la oficina con SQLite. Ese código y los datos viejos se movieron a `D:\BMP-Bluren\archivo-version-sqlite\` y también quedan en el historial de Git.

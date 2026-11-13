@@ -12,7 +12,6 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
-    "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
     "next": "^15.0.0",
@@ -21,7 +20,6 @@
     "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
