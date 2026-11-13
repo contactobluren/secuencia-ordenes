@@ -44,7 +44,8 @@ export async function POST(req: Request) {
 
     const activo =
       usuario?.activo === true ||
-      usuario?.activo === 1;
+      usuario?.activo === 1 ||
+      usuario?.activo === "1";
 
     if (usuarioError || !usuario || !activo) {
       await supabase.auth.signOut();

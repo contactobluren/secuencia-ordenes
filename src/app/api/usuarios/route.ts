@@ -14,6 +14,26 @@ function estaActivo(valor: unknown) {
   return valor === true || valor === 1 || valor === "1";
 }
 
+async function buscarAuthPorEmail(email: string) {
+  const buscado = email.trim().toLowerCase();
+
+  for (let page = 1; ; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: 100,
+    });
+
+    if (error) throw error;
+
+    const encontrado = data.users.find(
+      (u) => String(u.email || "").toLowerCase() === buscado
+    );
+    if (encontrado) return encontrado;
+
+    if (data.users.length < 100) return null;
+  }
+}
+
 async function checkAuth() {
   const auth = await getAuthenticatedUsuario();
 
@@ -185,27 +205,69 @@ if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
         );
       }
 
-      const { data: created, error: createError } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-        });
+      // Si ya existe una cuenta Auth con ese email (por ejemplo, de un
+      // intento anterior que quedó a medias), la reutilizamos en vez de
+      // intentar crear otra, que Supabase rechazaría.
+      const cuentaExistente = await buscarAuthPorEmail(email);
+      let newAuthUserId: string;
+      let cuentaCreadaAhora = false;
 
-      if (createError || !created.user) {
-        console.error("Error al crear cuenta Auth:", createError);
+      if (cuentaExistente) {
+        const { data: otroPerfil, error: otroPerfilError } = await supabaseAdmin
+          .from("usuarios")
+          .select("id")
+          .eq("auth_user_id", cuentaExistente.id)
+          .neq("id", id)
+          .maybeSingle();
 
-        return NextResponse.json(
-          {
-            error:
-              createError?.message ||
-              "No se pudo crear la cuenta de acceso en Supabase.",
-          },
-          { status: 400 }
-        );
+        if (otroPerfilError) throw otroPerfilError;
+
+        if (otroPerfil) {
+          return NextResponse.json(
+            { error: "Ya existe una cuenta de acceso con ese email vinculada a otro usuario." },
+            { status: 409 }
+          );
+        }
+
+        const { error: pwError } =
+          await supabaseAdmin.auth.admin.updateUserById(cuentaExistente.id, {
+            password,
+            email_confirm: true,
+          });
+
+        if (pwError) {
+          console.error("Error al actualizar cuenta Auth existente:", pwError);
+          return NextResponse.json(
+            { error: "No se pudo actualizar la contraseña. Detalle: " + pwError.message },
+            { status: 400 }
+          );
+        }
+
+        newAuthUserId = cuentaExistente.id;
+      } else {
+        const { data: created, error: createError } =
+          await supabaseAdmin.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+          });
+
+        if (createError || !created.user) {
+          console.error("Error al crear cuenta Auth:", createError);
+
+          return NextResponse.json(
+            {
+              error:
+                createError?.message ||
+                "No se pudo crear la cuenta de acceso en Supabase.",
+            },
+            { status: 400 }
+          );
+        }
+
+        newAuthUserId = created.user.id;
+        cuentaCreadaAhora = true;
       }
-
-      const newAuthUserId = created.user.id;
 
       const { data: updatedProfile, error: profileError } =
         await supabaseAdmin
@@ -225,14 +287,16 @@ if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
       if (profileError || !updatedProfile) {
         console.error("Error al vincular perfil:", profileError);
 
-        const { error: deleteAuthError } =
-          await supabaseAdmin.auth.admin.deleteUser(newAuthUserId);
+        if (cuentaCreadaAhora) {
+          const { error: deleteAuthError } =
+            await supabaseAdmin.auth.admin.deleteUser(newAuthUserId);
 
-        if (deleteAuthError) {
-          console.error(
-            "No se pudo eliminar la cuenta Auth creada:",
-            deleteAuthError
-          );
+          if (deleteAuthError) {
+            console.error(
+              "No se pudo eliminar la cuenta Auth creada:",
+              deleteAuthError
+            );
+          }
         }
 
         return NextResponse.json(
@@ -412,13 +476,57 @@ export async function DELETE(req: Request) {
       );
     }
 
-    return NextResponse.json(
-      {
-        error:
-          "La eliminación de usuarios está temporalmente deshabilitada para proteger las cuentas vinculadas.",
-      },
-      { status: 501 }
-    );
+    const { data: perfil, error: findError } = await supabaseAdmin
+      .from("usuarios")
+      .select("id, auth_user_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (findError) throw findError;
+
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "El usuario no existe. Actualizá la lista." },
+        { status: 404 }
+      );
+    }
+
+    // 1) Borrar el perfil de la aplicación.
+    const { error: deleteError } = await supabaseAdmin
+      .from("usuarios")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Error al eliminar perfil:", deleteError);
+
+      // 23503 = el usuario está referenciado en otros registros.
+      if (deleteError.code === "23503") {
+        return NextResponse.json(
+          {
+            error:
+              "No se puede eliminar porque el usuario tiene registros asociados. Desactivalo en su lugar.",
+          },
+          { status: 409 }
+        );
+      }
+      throw deleteError;
+    }
+
+    // 2) Borrar la cuenta de acceso vinculada, si existe.
+    const authUserId = String(perfil.auth_user_id || "").trim();
+    if (esUUID(authUserId)) {
+      const { error: authDeleteError } =
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
+
+      if (authDeleteError) {
+        // El perfil ya no existe, así que la cuenta no puede entrar a la app
+        // (el login exige un perfil vinculado). Solo lo registramos.
+        console.error("Perfil eliminado, pero no la cuenta Auth:", authDeleteError);
+      }
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Error al eliminar usuario:", error);
 

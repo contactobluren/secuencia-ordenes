@@ -175,9 +175,14 @@ const guardarUser = async () => {
       alert("No podés eliminar el usuario con el que estás logueado.");
       return;
     }
-    if (!confirm("¿Eliminar este usuario?")) return;
-    await apiDeleteUsuario(id);
-    await reloadUsers();
+    if (!confirm("¿Eliminar este usuario? También se borrará su cuenta de acceso.")) return;
+    try {
+      await apiDeleteUsuario(id);
+      await reloadUsers();
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+      alert(error instanceof Error ? error.message : "No se pudo eliminar el usuario");
+    }
   };
 
   const abrirNuevaArea = () => {

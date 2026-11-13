@@ -101,16 +101,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 bg-[#121a2b]/80 rounded-xl border border-slate-800 p-4 text-xs text-slate-400">
-          <p className="font-semibold text-slate-300 mb-2">Usuarios de demo</p>
-          <ul className="space-y-1">
-            <li>maria@empresa.com — <strong className="text-slate-200">1234</strong> (Comercial)</li>
-            <li>carlos@empresa.com — <strong className="text-slate-200">1234</strong> (Administración)</li>
-            <li>ana@empresa.com — <strong className="text-slate-200">1234</strong> (Técnica)</li>
-            <li>admin@empresa.com — <strong className="text-slate-200">admin</strong> (Admin)</li>
-          </ul>
-        </div>
-
         <p className="text-center text-[11px] text-slate-600 mt-6">
           © Bluren · <a href="https://www.bluren.com.ar/" className="text-blue-500 hover:underline" target="_blank" rel="noreferrer">bluren.com.ar</a>
         </p>
