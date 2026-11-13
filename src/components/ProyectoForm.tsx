@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiUpsertProyecto, apiLoadPlantillas } from "@/lib/api-client";
+import { apiUpsertProyecto, apiLoadPlantillas, apiLoadVendedores } from "@/lib/api-client";
 import { crearPasosDesdePlantilla } from "@/lib/workflow";
 import { Proyecto, Plantilla, MONEDAS } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ export default function ProyectoForm() {
     nombre_cliente: "",
     codigo_proyecto: "",
     canal_venta: "",
+    vendedor_id: "",
     moneda: "ARS",
     presupuesto_estimado: "",
     monto_anticipo: "",
@@ -31,6 +32,19 @@ export default function ProyectoForm() {
     plantilla_id: "",
   });
   const [errorMonto, setErrorMonto] = useState("");
+  const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([]);
+
+  useEffect(() => {
+    apiLoadVendedores()
+      .then((list) => {
+        setVendedores(list);
+        // Si quien carga el proyecto es vendedor, se propone como vendedor.
+        if (usuario && list.some((v) => v.id === usuario.id)) {
+          setForm((f) => (f.vendedor_id ? f : { ...f, vendedor_id: usuario.id }));
+        }
+      })
+      .catch(console.error);
+  }, [usuario]);
 
   useEffect(() => {
     apiLoadPlantillas()
@@ -92,6 +106,8 @@ export default function ProyectoForm() {
       nombre_cliente: form.nombre_cliente.trim(),
       codigo_proyecto: codigo,
       canal_venta: form.canal_venta.trim(),
+      vendedor_id: form.vendedor_id || undefined,
+      vendedor_nombre: vendedores.find((v) => v.id === form.vendedor_id)?.nombre,
       moneda: form.moneda,
       presupuesto_estimado: presupuesto,
       monto_anticipo: anticipo,
@@ -299,6 +315,23 @@ export default function ProyectoForm() {
               className={inputClass}
               placeholder="Showroom, Web, Referido..."
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">
+              Vendedor
+            </label>
+            <select
+              name="vendedor_id"
+              value={form.vendedor_id}
+              onChange={handleChange}
+              className={inputClass}
+            >
+              <option value="">Sin asignar</option>
+              {vendedores.map((v) => (
+                <option key={v.id} value={v.id}>{v.nombre}</option>
+              ))}
+            </select>
           </div>
         </div>
 

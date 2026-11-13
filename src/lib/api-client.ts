@@ -71,6 +71,15 @@ export async function apiDeleteUsuario(id: string): Promise<void> {
   await json(await fetch(`/api/usuarios?id=${encodeURIComponent(id)}`, { method: "DELETE" }));
 }
 
+/** Usuarios activos del área Comercial, para elegir vendedor. */
+export async function apiLoadVendedores(): Promise<{ id: string; nombre: string }[]> {
+  const usuarios = await apiLoadUsuarios();
+  return usuarios
+    .filter((u) => u.activo && u.areaNombre === "Comercial")
+    .map((u) => ({ id: u.id, nombre: u.nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre));
+}
+
 // --- Áreas ---
 export async function apiLoadAreas(): Promise<Area[]> {
   return json(await fetch("/api/areas"));

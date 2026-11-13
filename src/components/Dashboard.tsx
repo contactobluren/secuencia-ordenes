@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroArea, setFiltroArea] = useState("");
+  const [filtroVendedor, setFiltroVendedor] = useState("");
 
   useEffect(() => {
     apiLoadProyectos().then(setProyectos).catch(console.error);
@@ -35,6 +36,9 @@ export default function Dashboard() {
         return false;
       if (filtroCanal && !(p.canal_venta || "").toLowerCase().includes(filtroCanal.toLowerCase()))
         return false;
+      if (filtroVendedor === "__sin__" && p.vendedor_id) return false;
+      if (filtroVendedor && filtroVendedor !== "__sin__" && p.vendedor_id !== filtroVendedor)
+        return false;
       if (filtroTipo && p.plantilla_id !== filtroTipo) return false;
       if (filtroEstado && p.estado_general !== filtroEstado) return false;
       if (filtroArea) {
@@ -48,7 +52,16 @@ export default function Dashboard() {
       }
       return true;
     });
-  }, [proyectos, filtroCliente, filtroCanal, filtroTipo, filtroEstado, filtroArea]);
+  }, [proyectos, filtroCliente, filtroCanal, filtroVendedor, filtroTipo, filtroEstado, filtroArea]);
+
+  /** Vendedores que aparecen en los proyectos cargados */
+  const vendedoresUnicos = useMemo(() => {
+    const map = new Map<string, string>();
+    proyectos.forEach((p) => {
+      if (p.vendedor_id) map.set(p.vendedor_id, p.vendedor_nombre || "Sin nombre");
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [proyectos]);
 
   const tiposUnicos = useMemo(() => {
     const map = new Map<string, string>();
@@ -166,7 +179,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 mb-3 text-sm font-medium text-slate-400">
           <Filter className="w-4 h-4" /> Filtros
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
@@ -184,6 +197,19 @@ export default function Dashboard() {
             onChange={(e) => setFiltroCanal(e.target.value)}
             className={inputClass}
           />
+          <select
+            value={filtroVendedor}
+            onChange={(e) => setFiltroVendedor(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Todos los vendedores</option>
+            <option value="__sin__">Sin vendedor</option>
+            {vendedoresUnicos.map(([id, nombre]) => (
+              <option key={id} value={id}>
+                {nombre}
+              </option>
+            ))}
+          </select>
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
@@ -261,6 +287,7 @@ export default function Dashboard() {
                             </div>
                             <div className="text-xs text-slate-500">
                               {p.nombre_cliente} · {p.codigo_proyecto}
+                              {p.vendedor_nombre && <> · Vend: {p.vendedor_nombre}</>}
                             </div>
                           </div>
                         </div>
@@ -357,6 +384,7 @@ export default function Dashboard() {
                       </h3>
                       <p className="text-xs text-slate-500 truncate">
                         {p.nombre_cliente} · {p.plantilla_nombre}
+                        {p.vendedor_nombre && <> · Vend: {p.vendedor_nombre}</>}
                       </p>
                     </div>
                     <ChevronRight className="w-5 h-5 text-slate-600 shrink-0" />

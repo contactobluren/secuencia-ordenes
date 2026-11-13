@@ -28,6 +28,9 @@ function mapProyecto(row: Record<string, unknown>): Proyecto {
     titulo: String(row.titulo ?? ""),
     nombre_cliente: String(row.nombre_cliente ?? ""),
     canal_venta: String(row.canal_venta ?? ""),
+    vendedor_id: row.vendedor_id == null ? undefined : String(row.vendedor_id),
+    vendedor_nombre:
+      row.vendedor_nombre == null ? undefined : String(row.vendedor_nombre),
     moneda: String(row.moneda ?? "ARS"),
     presupuesto_estimado: Number(row.presupuesto_estimado ?? 0),
     monto_anticipo: Number(row.monto_anticipo ?? 0),
@@ -166,6 +169,8 @@ export async function POST(request: Request) {
       titulo: body.titulo,
       nombre_cliente: body.nombre_cliente,
       canal_venta: body.canal_venta ?? "",
+      vendedor_id: body.vendedor_id || null,
+      vendedor_nombre: body.vendedor_id ? body.vendedor_nombre ?? "" : null,
       moneda: body.moneda ?? "ARS",
       presupuesto_estimado: Number(body.presupuesto_estimado ?? 0),
       monto_anticipo: Number(body.monto_anticipo ?? 0),

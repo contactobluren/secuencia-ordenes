@@ -84,6 +84,10 @@ export interface Proyecto {
   nombre_cliente: string;
   codigo_proyecto: string;
   canal_venta: string;
+  /** Usuario del área Comercial asignado como vendedor */
+  vendedor_id?: string;
+  /** Nombre del vendedor (copia para mostrar aunque el usuario cambie) */
+  vendedor_nombre?: string;
   /** Código ISO de moneda */
   moneda: Moneda | string;
   /** Presupuesto total (número con hasta 2 decimales) */

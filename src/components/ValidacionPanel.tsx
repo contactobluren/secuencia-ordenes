@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Proyecto, ProyectoPaso } from "@/lib/types";
-import { apiGetProyecto, apiUpsertProyecto, apiDeleteProyecto } from "@/lib/api-client";
+import { apiGetProyecto, apiUpsertProyecto, apiDeleteProyecto, apiLoadVendedores } from "@/lib/api-client";
 import {
   esPasoCobro,
   conceptoDesdeHito,
@@ -62,6 +62,7 @@ export default function ValidacionPanel({ proyectoId }: Props) {
     nombre_cliente: "",
     codigo_proyecto: "",
     canal_venta: "",
+    vendedor_id: "",
     moneda: "ARS",
     presupuesto_estimado: "",
     monto_anticipo: "",
@@ -75,9 +76,15 @@ export default function ValidacionPanel({ proyectoId }: Props) {
   const [pagoForm, setPagoForm] = useState({ monto: "", medio: "Transferencia", observaciones: "" });
   const [errorPago, setErrorPago] = useState("");
 
+  const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([]);
+
   useEffect(() => {
     apiGetProyecto(proyectoId).then(setProyecto).catch(console.error);
   }, [proyectoId]);
+
+  useEffect(() => {
+    apiLoadVendedores().then(setVendedores).catch(console.error);
+  }, []);
 
   if (!proyecto || !usuario) {
     return (
@@ -105,6 +112,7 @@ export default function ValidacionPanel({ proyectoId }: Props) {
       nombre_cliente: proyecto.nombre_cliente || "",
       codigo_proyecto: proyecto.codigo_proyecto || "",
       canal_venta: proyecto.canal_venta || "",
+      vendedor_id: proyecto.vendedor_id || "",
       moneda: String(proyecto.moneda || "ARS"),
       presupuesto_estimado: String(proyecto.presupuesto_estimado ?? ""),
       monto_anticipo: String(proyecto.monto_anticipo ?? ""),
@@ -139,6 +147,11 @@ export default function ValidacionPanel({ proyectoId }: Props) {
       nombre_cliente: editForm.nombre_cliente.trim(),
       codigo_proyecto: editForm.codigo_proyecto.trim().toUpperCase() || proyecto.codigo_proyecto,
       canal_venta: editForm.canal_venta.trim(),
+      vendedor_id: editForm.vendedor_id || undefined,
+      vendedor_nombre: editForm.vendedor_id
+        ? vendedores.find((v) => v.id === editForm.vendedor_id)?.nombre ??
+          (editForm.vendedor_id === proyecto.vendedor_id ? proyecto.vendedor_nombre : undefined)
+        : undefined,
       moneda: editForm.moneda,
       presupuesto_estimado: presup,
       monto_anticipo: ant,
@@ -377,6 +390,11 @@ export default function ValidacionPanel({ proyectoId }: Props) {
         {proyecto.canal_venta && (
           <div className="text-slate-400">
             Canal: <span className="text-slate-300">{proyecto.canal_venta}</span>
+          </div>
+        )}
+        {proyecto.vendedor_nombre && (
+          <div className="text-slate-400">
+            Vendedor: <span className="text-slate-300">{proyecto.vendedor_nombre}</span>
           </div>
         )}
         {proyecto.creado_por && (
@@ -822,6 +840,18 @@ export default function ValidacionPanel({ proyectoId }: Props) {
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Canal de venta</label>
                 <input value={editForm.canal_venta} onChange={(e) => setEditForm((f) => ({ ...f, canal_venta: e.target.value }))} className="w-full px-3 py-2 border border-slate-700 rounded-xl text-sm bg-[#0f172a] text-slate-100 outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Vendedor</label>
+                <select value={editForm.vendedor_id} onChange={(e) => setEditForm((f) => ({ ...f, vendedor_id: e.target.value }))} className="w-full px-3 py-2 border border-slate-700 rounded-xl text-sm bg-[#0f172a] text-slate-100 outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Sin asignar</option>
+                  {vendedores.map((v) => (
+                    <option key={v.id} value={v.id}>{v.nombre}</option>
+                  ))}
+                  {proyecto.vendedor_id && !vendedores.some((v) => v.id === proyecto.vendedor_id) && (
+                    <option value={proyecto.vendedor_id}>{proyecto.vendedor_nombre || "Vendedor anterior"}</option>
+                  )}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Estado general</label>
