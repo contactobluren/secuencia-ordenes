@@ -21,10 +21,7 @@ export default function PagosPage() {
   const router = useRouter();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const isAdmin = usuario?.areaNombre === "Admin";
-  const canSee =
-    isAdmin ||
-    usuario?.areaNombre === "Comercial" ||
-    usuario?.areaNombre === "Administracion";
+  const canSee = isAdmin;
 
   useEffect(() => {
     if (usuario && !canSee) router.replace("/");

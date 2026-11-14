@@ -46,13 +46,13 @@ const handleLogout = async () => {
                 <LayoutDashboard className="w-4 h-4" />
                 <span className="hidden md:inline">Resumen</span>
               </Link>
-              <Link href="/metricas" className={linkClass(pathname === "/metricas")}>
-                <BarChart3 className="w-4 h-4" />
-                <span className="hidden md:inline">Métricas</span>
-              </Link>
-              {(isAdmin ||
-                usuario?.areaNombre === "Comercial" ||
-                usuario?.areaNombre === "Administracion") && (
+              {isAdmin && (
+                <Link href="/metricas" className={linkClass(pathname === "/metricas")}>
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="hidden md:inline">Métricas</span>
+                </Link>
+              )}
+              {isAdmin && (
                 <Link href="/pagos" className={linkClass(pathname === "/pagos")}>
                   <Banknote className="w-4 h-4" />
                   <span className="hidden md:inline">Pagos</span>
