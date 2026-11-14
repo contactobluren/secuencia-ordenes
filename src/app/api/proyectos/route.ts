@@ -31,7 +31,7 @@ function mapProyecto(row: Record<string, unknown>): Proyecto {
     vendedor_id: row.vendedor_id == null ? undefined : String(row.vendedor_id),
     vendedor_nombre:
       row.vendedor_nombre == null ? undefined : String(row.vendedor_nombre),
-    moneda: String(row.moneda ?? "ARS"),
+    moneda: String(row.moneda || "ARS"),
     presupuesto_estimado: Number(row.presupuesto_estimado ?? 0),
     monto_anticipo: Number(row.monto_anticipo ?? 0),
     monto_saldo:
@@ -44,8 +44,9 @@ function mapProyecto(row: Record<string, unknown>): Proyecto {
     plantilla_nombre: String(row.plantilla_nombre ?? ""),
     pasos: parseArray(row.pasos_json),
     pagos: parseArray(row.pagos_json),
+    // Algunos proyectos importados tienen el estado vacío: se tratan como "En curso".
     estado_general: String(
-      row.estado_general ?? "En curso"
+      row.estado_general || "En curso"
     ) as Proyecto["estado_general"],
     created_at: String(row.created_at ?? ""),
     creado_por:
